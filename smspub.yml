@@ -61,13 +61,13 @@ Resources:
             Action:
             - logs:*
             Resource: arn:aws:logs:*:*:*
-      - PolicyName: ses
+      - PolicyName: sns
         PolicyDocument:
           Version: '2012-10-17'
           Statement:
           - Effect: Allow
             Action:
-            - ses:SendEmail
+            - sns:Publish
             Resource: '*'
       - PolicyName: querysubs
         PolicyDocument:

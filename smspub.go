@@ -12,6 +12,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/sns/snsiface"
+	"github.com/aws/aws-sdk-go/service/sns"
 )
 
 var (
@@ -20,6 +22,7 @@ var (
 
 type AWSContext struct {
 	ddbSvc dynamodbiface.DynamoDBAPI
+	snsSvc snsiface.SNSAPI
 }
 
 
@@ -53,6 +56,16 @@ func notify(awsContext *AWSContext,instanceId, state string) error {
 	for _, item := range items {
 		notifyDestination := item["Notify"].S
 		log.Printf("Notify %s\n", *notifyDestination)
+
+		publishInput := &sns.PublishInput{
+			Message: aws.String(fmt.Sprintf("new status for %s: %s", instanceId, state)),
+			PhoneNumber: notifyDestination,
+		}
+
+		_, err := awsContext.snsSvc.Publish(publishInput)
+		if err != nil {
+			log.Printf("Error publishing message: %s\n", err.Error())
+		}
 	}
 
 	return nil
@@ -83,9 +96,9 @@ func main() {
 	var awsContext AWSContext
 
 	sess := session.New()
-	svc := dynamodb.New(sess)
 
-	awsContext.ddbSvc = svc
+	awsContext.ddbSvc = dynamodb.New(sess)
+	awsContext.snsSvc = sns.New(sess)
 
 	handler := makeHandler(&awsContext)
 	lambda.Start(handler)
