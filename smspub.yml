@@ -1,0 +1,93 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Deploy a lambda function that maintains the records status model state
+
+Parameters:
+  CodeBucketName:
+    Type: String
+    Description: Bucket containing lambda code zip file
+  ZipFileName:
+    Type: String
+    Default: smspub-deployment.zip
+  StreamArn:
+    Type: String
+    Description: StreamArn to consume events from
+  TableName:
+    Type: String
+    Description: Table source of events
+
+
+Resources:
+
+  StreamHookLambda:
+    Type: "AWS::Lambda::Function"
+    Properties:
+      Handler: main
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref CodeBucketName
+        S3Key: !Ref ZipFileName
+      Runtime: "go1.x"
+      MemorySize: 512
+      Timeout: 20
+
+
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+            - edgelambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: "/"
+      Policies:
+      - PolicyName: logs
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - logs:*
+            Resource: arn:aws:logs:*:*:*
+      - PolicyName: ses
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - ses:SendEmail
+            Resource: '*'
+      - PolicyName: streams
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - dynamodb:DescribeStream
+            - dynamodb:GetRecords
+            - dynamodb:GetShardIterator
+            - dynamodb:ListStreams
+            Resource: !Join [ '', ['arn:aws:dynamodb:', !Ref 'AWS::Region' , ':', !Ref 'AWS::AccountId', ':table/', !Ref 'TableName', '/stream/*']]
+      - PolicyName: metrics
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - cloudwatch:PutMetricData
+            Resource: '*'
+
+  EventSourceMapping:
+    Type: "AWS::Lambda::EventSourceMapping"
+    Properties:
+      BatchSize: 20
+      Enabled: True
+      EventSourceArn: !Ref StreamArn
+      FunctionName: !GetAtt StreamHookLambda.Arn
+      StartingPosition: TRIM_HORIZON
