@@ -15,6 +15,9 @@ Parameters:
   TableName:
     Type: String
     Description: Table source of events
+  SMSSubscriptionsTableName:
+    Type: String
+    Description: DDB table with instance notification subscriptions
 
 
 Resources:
@@ -30,6 +33,9 @@ Resources:
       Runtime: "go1.x"
       MemorySize: 512
       Timeout: 20
+      Environment:
+        Variables:
+          SUB_TABLE: !Ref SMSSubscriptionsTableName
 
 
   LambdaExecutionRole:
@@ -63,6 +69,14 @@ Resources:
             Action:
             - ses:SendEmail
             Resource: '*'
+      - PolicyName: querysubs
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - dynamodb:Query
+            Resource: !Join [ '', ['arn:aws:dynamodb:', !Ref 'AWS::Region' , ':', !Ref 'AWS::AccountId', ':table/', !Ref 'SMSSubscriptionsTableName']]
       - PolicyName: streams
         PolicyDocument:
           Version: '2012-10-17'
