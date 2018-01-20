@@ -25,7 +25,14 @@ type AWSContext struct {
 	snsSvc snsiface.SNSAPI
 }
 
+var sender = &sns.MessageAttributeValue{
+	DataType:aws.String("String"),
+	StringValue:aws.String("APSStatus"),
+}
 
+var messageAttrs = map[string]*sns.MessageAttributeValue{
+	"AWS.SNS.SMS.SenderID":sender,
+}
 
 
 func notify(awsContext *AWSContext,instanceId, state string) error {
@@ -60,6 +67,7 @@ func notify(awsContext *AWSContext,instanceId, state string) error {
 		publishInput := &sns.PublishInput{
 			Message: aws.String(fmt.Sprintf("new status for %s: %s", instanceId, state)),
 			PhoneNumber: notifyDestination,
+			MessageAttributes:messageAttrs,
 		}
 
 		_, err := awsContext.snsSvc.Publish(publishInput)
@@ -80,7 +88,7 @@ func makeHandler(awsContext *AWSContext) func(ctx context.Context, e events.Dyna
 
 
 			instanceId := record.Change.NewImage["instanceId"].String()
-			state := record.Change.NewImage["instanceId"].String()
+			state := record.Change.NewImage["state"].String()
 
 			err := notify(awsContext, instanceId, state)
 			if err != nil {
